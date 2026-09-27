@@ -1,0 +1,28 @@
+# dependencies (bun install)
+node_modules
+
+# output
+out
+dist
+*.tgz
+
+# coverage
+coverage
+*.lcov
+
+# logs
+logs
+*.log
+
+# sqlite databases
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+
+# caches
+.cache
+*.tsbuildinfo
+
+# IDE / OS
+.idea
+.DS_Store

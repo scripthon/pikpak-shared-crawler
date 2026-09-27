@@ -1,0 +1,50 @@
+{
+  "name": "pikpak-shared-crawler",
+  "version": "1.0.0",
+  "description": "Crawler/indexer for public PikPak share links, backed by pikpak-sdk and bun:sqlite",
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./engine": {
+      "types": "./src/engine.ts",
+      "default": "./src/engine.ts"
+    },
+    "./store": {
+      "types": "./src/store.ts",
+      "default": "./src/store.ts"
+    },
+    "./client": {
+      "types": "./src/client.ts",
+      "default": "./src/client.ts"
+    },
+    "./types": {
+      "types": "./src/types.ts",
+      "default": "./src/types.ts"
+    }
+  },
+  "bin": {
+    "pikpak-shared-crawl": "cli/bin.ts"
+  },
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "tsc --noEmit",
+    "build": "bun build src/index.ts --outdir dist --target node",
+    "crawl": "bun cli/bin.ts"
+  },
+  "type": "module",
+  "private": true,
+  "dependencies": {
+    "pikpak-sdk": "git+ssh://git@github.com/scripthon/pikpak-sdk.git#main"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  }
+}
