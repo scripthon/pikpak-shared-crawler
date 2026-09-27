@@ -1,105 +1,163 @@
 # pikpak-shared-crawler
 
-Crawler/indexer for **public PikPak share links**. Walks a share link, stores
-every file/folder into SQLite, supports resume, cancellation and progress
-events. Built on [`pikpak-sdk`](https://github.com/scripthon/pikpak-sdk) and
-`bun:sqlite`.
+High-performance crawler and indexer for **public PikPak share links**. Recursively walks share hierarchies, indexes metadata into SQLite, and supports cooperative cancellation, resumable crawling, and live progress events.
 
-- Library-first (no HTTP/UI): usable from a CLI, a web API, or any Bun app.
-- Resumable: finished folders are recorded in `done_folders` and skipped on re-run.
-- Progress: `progress` events + persisted `crawl_jobs` rows.
+Built on [`pikpak-sdk`](https://github.com/scripthon/pikpak-sdk) and `bun:sqlite`.
 
-## Install
+> **Disclaimer**: This is an **unofficial** tool designed for public share links. It is not affiliated with, sponsored by, or endorsed by PikPak.
 
-```sh
+---
+
+## Features
+
+- **Library & CLI**: Use as an interactive terminal CLI tool or embed as a library in any Bun application / web server.
+- **Resumable Crawls**: Finished folders are tracked in `done_folders` and skipped on subsequent runs.
+- **Live TUI & Logging**: Interactive terminal UI with real-time stats and recent items list; automatically falls back to plain logs when piped.
+- **Full Metadata Preservation**: Stores all scalar attributes, timestamps, media streams, and original raw API objects.
+- **Concurrent-Safe SQLite**: Configured with WAL mode and a 30s busy timeout for concurrent read access by API servers.
+
+---
+
+## Installation
+
+```bash
+bun add git+https://github.com/scripthon/pikpak-shared-crawler.git
+# or via SSH
 bun add git+ssh://git@github.com/scripthon/pikpak-shared-crawler.git
 ```
 
-## CLI
+---
 
-```sh
-bun run crawl <share-url> [--links] [--debug] [--no-raw] [--tui|--no-tui] [database.sqlite]
-# or after install:
+## CLI Usage
+
+Run directly with Bun:
+
+```bash
+bun run crawl <share-url> [flags] [database.sqlite]
+# or after installing globally / as a dependency:
 pikpak-shared-crawl https://mypikpak.com/s/xxxxxxxxxxxx database.sqlite
 ```
 
-`--links` also resolves a direct download URL per file (slower).
-`--no-raw` skips storing the full raw API object (smaller database).
+### Options & Flags
 
-### TUI
+| Flag / Argument | Type | Default | Description |
+|---|---|---|---|
+| `<share-url>` | `string` | *Required* | Public PikPak share link or raw share ID |
+| `[database.sqlite]` | `string` | `database.sqlite` | Destination SQLite database file path |
+| `--links` | `boolean` | `false` | Resolves direct streaming/download URL per file (slower) |
+| `--no-raw` | `boolean` | `false` | Skips storing full raw API response in `files.raw` (reduces DB size) |
+| `--tui` | `boolean` | `auto` | Forces real-time interactive terminal UI dashboard |
+| `--no-tui` | `boolean` | `false` | Forces plain sequential log output |
+| `--debug` | `boolean` | `false` | Enables verbose per-folder debugging logs |
 
-When stdout is a TTY the crawler renders a live terminal UI: stat boxes for
-**FILES / FOLDERS / SUKSES / ERROR** plus a **TERBARU** list of recent items
-(timestamp, `D`/`F`, path, size). Long names are truncated width-aware, keeping
-the basename and extension (`…/13V/video_042.mp4`). Use `q` / `Ctrl-C` to stop.
+### TUI Dashboard
 
-- `--tui` forces the TUI, `--no-tui` forces plain logs.
-- `--debug` also uses plain logs (per-folder detail lines).
-- Falls back to ASCII box-drawing when the locale is not UTF-8.
-- Non-TTY output (e.g. piping to a file) automatically uses plain logs.
+When stdout is a TTY, the crawler renders an interactive terminal dashboard:
+- **Stat Boxes**: Real-time counters for `FILES`, `FOLDERS`, `SUKSES`, and `ERROR`.
+- **Recent Items**: Live ring-buffer showing timestamp, kind (`D`/`F`), truncated path, and human-readable file size.
+- Press `q` or `Ctrl-C` to stop cooperatively.
 
+---
 
-## Library
+## Library Usage
 
-```ts
+```typescript
 import { openCrawlDb, Crawler, createCrawlClient } from "pikpak-shared-crawler";
 
-const store = openCrawlDb("database.sqlite");           // shares/files/done_folders/crawl_jobs
+const store = openCrawlDb("database.sqlite");
 const crawler = new Crawler({ store, client: createCrawlClient() });
 
-const job = crawler.start({ url: "https://mypikpak.com/s/<id>" });
-job.on("progress", (p) => console.log(p.items, p.errors, p.currentPath));
-job.on("item", (it) => console.log(it.at, it.ok ? "ok" : "err", it.path));
-job.on("done", (r) => console.log("done", r.items));
+const job = crawler.start({ url: "https://mypikpak.com/s/xxxxxxxxxxxx" });
 
-await job.done;          // CrawlResult
-job.cancel();            // cooperative cancel
+job.on("progress", (p) => {
+  console.log(`[${p.status}] ${p.items} files, ${p.folders} folders (${p.currentPath})`);
+});
+
+job.on("item", (it) => {
+  console.log(`${it.ok ? "✓" : "✗"} ${it.folder ? "[DIR]" : "[FILE]"} ${it.path}`);
+});
+
+job.on("done", (result) => {
+  console.log(`Crawl completed! Total items: ${result.items}`);
+});
+
+// Await completion or cancel cooperatively
+const result = await job.done;
 store.close();
 ```
 
-Or simply:
+### Event Reference
 
-```ts
-const result = await crawler.crawlShare({ url });
-```
+| Event | Payload | Trigger |
+|---|---|---|
+| `progress` | `CrawlProgress` | Emitted periodically as items and folders are processed |
+| `item` | `CrawlItemEvent` | Emitted for each file or folder indexed (or item-level error) |
+| `done` | `CrawlResult` | Emitted when the entire crawl finishes successfully |
+| `error` | `CrawlProgress & CrawlResult` | Emitted when an unrecoverable error terminates the job |
+| `cancelled` | `CrawlProgress & CrawlResult` | Emitted when `job.cancel()` is triggered |
 
-## Data model
+---
 
-| Table | Purpose |
+## Database Architecture
+
+### SQLite Tables
+
+| Table | Description |
 |---|---|
-| `shares` | one row per crawled share |
-| `files` | every file/folder, with the full set of API fields |
-| `done_folders` | resume markers |
-| `crawl_jobs` | job status + progress (`queued\|running\|done\|error\|cancelled\|interrupted`) |
+| `shares` | Records each crawled share ID and initial crawl timestamp |
+| `files` | Full index of every file and folder discovered across shares |
+| `done_folders` | Resume checkpoints marking completed folders |
+| `crawl_jobs` | Job lifecycle status, progress metrics, and error logs |
 
-`files` stores (columns): `file_id`, `share_id`, `parent_id`, `name`, `kind`,
-`size`, `path`, `mime_type`, `file_extension`, `user_id`, `revision`, `hash`,
-`phase`, `created_time`, `modified_time`, `user_modified_time`, `delete_time`,
-`web_content_link`, `icon_link`, `thumbnail_link`, `folder_type`, `space`,
-`trashed`, `starred`, `writable`, plus JSON columns `links`, `medias`, `audit`,
-`params`, `apps`, `tags`, `reference_events` and `raw` (the complete original
-API object).
+### `files` Schema Breakdown
 
-Existing databases are migrated automatically: missing columns are added with
-`ALTER TABLE` on open. Rows crawled before a migration have `NULL` in the new
-columns until they are re-crawled.
+| Category | Columns | Description |
+|---|---|---|
+| **Identity & Hierarchy** | `file_id`, `share_id`, `parent_id`, `name`, `kind`, `path` | Primary IDs, parent linkage, and full relative path |
+| **File Attributes** | `size`, `mime_type`, `file_extension`, `hash`, `phase` | Byte size, MIME type, extension, GCID hash, and phase |
+| **Timestamps** | `created_time`, `modified_time`, `user_modified_time`, `delete_time` | ISO 8601 creation and modification timestamps |
+| **Links & Media** | `web_content_link`, `icon_link`, `thumbnail_link` | Direct links, thumbnail images, and file icons |
+| **Status Flags** | `trashed`, `starred`, `writable`, `folder_type`, `space` | Audit status and folder classifications |
+| **Structured Data** | `links`, `medias`, `audit`, `params`, `apps`, `tags`, `reference_events`, `raw` | JSON columns for media streams, audit info, and raw API object |
 
-Read helpers: `getStats`, `listShares`, `listChildren`, `searchFiles`,
-`getFile`, `getAncestors`, `getDescendants`.
+Existing databases are automatically migrated on open via `ALTER TABLE ADD COLUMN`.
 
-## Notes
+---
 
-- Public shares are crawled anonymously. To crawl as an account, pass explicit
-  tokens: `createCrawlClient({ accessToken, refreshToken, deviceId })`.
-- `bun:sqlite` runs in WAL mode with a 30s busy timeout, so multiple
-  processes (e.g. a web API) can read the same file concurrently.
-- `storeRaw: false` (or CLI `--no-raw`) keeps only the scalar/JSON columns
-  above and skips the `raw` blob if you want a smaller database.
+## Store Helper APIs
+
+`CrawlStore` provides built-in query methods for consuming the indexed data:
+
+| Method | Return Type | Description |
+|---|---|---|
+| `store.getStats()` | `CrawlStats` | Total count of files, folders, shares, and combined byte size |
+| `store.listShares()` | `ShareRow[]` | Lists all crawled shares and crawl dates |
+| `store.listChildren(shareId, parentId, opts)` | `CrawlFileRow[]` | Lists folder contents with sorting, pagination, and folders-first |
+| `store.searchFiles(keyword, opts)` | `CrawlFileRow[]` | Performs case-insensitive search across file names |
+| `store.getFile(fileId)` | `CrawlFileRow \| null` | Fetches a single file record by ID |
+| `store.getAncestors(fileId)` | `CrawlFileRow[]` | Resolves ancestor chain from root to parent folder |
+| `store.getDescendants(folderId)` | `CrawlFileRow[]` | Recursively returns all files and subfolders under a folder |
+
+---
 
 ## Development
 
-```sh
+```bash
+# Install dependencies
 bun install
+
+# Run test suite
 bun test
+
+# Validate TypeScript types
 bun run typecheck
+
+# Build bundle
+bun run build
 ```
+
+---
+
+## License
+
+MIT
