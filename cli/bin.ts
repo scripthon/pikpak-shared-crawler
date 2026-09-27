@@ -48,7 +48,7 @@ function printFinal(result: CrawlResult): void {
 }
 
 if (useTui) {
-  const tui = new CrawlTui(job);
+  const tui = new CrawlTui(job, { dbFile });
   tui.start();
   const result = await job.done;
   tui.stop();

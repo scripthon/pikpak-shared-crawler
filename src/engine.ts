@@ -95,6 +95,11 @@ export class CrawlJob {
     return this;
   }
 
+  off(event: CrawlEvent, listener: (payload: any) => void): this {
+    this.handlers.get(event)?.delete(listener);
+    return this;
+  }
+
   emit(event: CrawlEvent, payload: any): void {
     for (const listener of this.handlers.get(event) ?? []) listener(payload);
   }
