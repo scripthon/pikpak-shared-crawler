@@ -5,7 +5,7 @@
     "": {
       "name": "pikpak-shared-crawler",
       "dependencies": {
-        "pikpak-sdk": "git+ssh://git@github.com/scripthon/pikpak-sdk.git#main",
+        "pikpak-sdk": "github:scripthon/pikpak-sdk",
       },
       "devDependencies": {
         "@types/bun": "latest",
@@ -22,7 +22,7 @@
 
     "bun-types": ["bun-types@1.4.2", "", { "dependencies": { "@types/node": "*" } }, "sha512-bxV1FgK7yBIzjRe5zBozIM4Bem11ZJcCXSrjWRG3YWLt8yFDePu4cLjpebO8OvPeIE9trbyPF4fuj3Cia4Fj3w=="],
 
-    "pikpak-sdk": ["pikpak-sdk@git+ssh://git@github.com/scripthon/pikpak-sdk.git#7f604f521d35b12099edd69718731b8884a62201", { "peerDependencies": { "typescript": "^5" } }, "7f604f521d35b12099edd69718731b8884a62201"],
+    "pikpak-sdk": ["pikpak-sdk@github:scripthon/pikpak-sdk#8da48ad", { "peerDependencies": { "typescript": "^5" } }, "scripthon-pikpak-sdk-8da48ad", "sha512-AHyBoMCXfOUGFtp/TZpHxCI/Ude2jiqT73dJNB0OgfJaQpzlXViRwD98O63gllmqDT6rW1OayitNzxw0Oapa6A=="],
 
     "typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
 

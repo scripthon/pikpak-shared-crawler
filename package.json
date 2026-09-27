@@ -39,7 +39,7 @@
   "type": "module",
   "private": true,
   "dependencies": {
-    "pikpak-sdk": "git+ssh://git@github.com/scripthon/pikpak-sdk.git#main"
+    "pikpak-sdk": "github:scripthon/pikpak-sdk"
   },
   "devDependencies": {
     "@types/bun": "latest"
